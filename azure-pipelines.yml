@@ -3,7 +3,7 @@ variables:
   CI_NAME: Azure Pipelines
   CI_BUILD_ID: $(Build.BuildId)
   CI_BUILD_URL: "https://dev.azure.com/plasmapy/plasmapy/_build/results?buildId=$(Build.BuildId)"
-  CIBW_BUILD: cp36-* cp37-*
+  CIBW_BUILD: cp36-* cp37-* cp38-*
   CIBW_SKIP: "*-win32 *-manylinux1_i686"
 
 resources:
@@ -68,7 +68,7 @@ jobs:
       ${{ if startsWith(variables['Build.SourceBranch'], 'refs/tags/') }}:
         pypi_connection_name : 'PyPI'
       test_extras: 'dev'
-      test_command: 'pytest -p no:warnings --doctest-rst -m "not figure" --pyargs plasmapy'
+      test_command: 'pytest --doctest-rst --pyargs plasmapy'
       submodules: false
       targets:
         - wheels_linux
