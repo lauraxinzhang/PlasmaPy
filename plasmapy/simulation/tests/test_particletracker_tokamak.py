@@ -40,7 +40,7 @@ def sim_many(coils):
 
 
 def test_1(sim_single):
-    solution = sim_single.run(1 * u.s, 1e-3 * u.s)
+    solution = sim_single.run(1 * u.s)
     assert abs(solution.data.position.sel(dimension='y').mean()).item() < 4  # should be about 5m for no B field
     assert 0.001 < abs(solution.data.position.sel(dimension='y').mean()).item() < 0.01
 

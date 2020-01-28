@@ -317,7 +317,7 @@ class ParticleTracker:
         self._v = value.si.value
 
     @check_units()
-    def run(self, total_time: u.s, dt: u.s = None, progressbar = True):
+    def run(self, total_time: u.s, dt: u.s = None, tolerance = 1e-8, progressbar = True):
         r"""
         Runs a simulation instance.
          dt: u.s = np.inf * u.s,
@@ -360,20 +360,52 @@ class ParticleTracker:
 
             _x = _x - _v * 0.5 * _dt
 
+            _x_for_double = _x.copy()
+            _v_for_double = _v.copy()
+
             _position_history = [_x.copy()]
             _velocity_history = [_v.copy()]
             if progressbar:
                 pbar = tqdm.auto.tqdm(total=_total_time, unit="s")
             while _time < _total_time:
-                _time += _dt
+                _x_for_double[...] = _x
+                _v_for_double[...] = _v
+
                 b = self.plasma._interpolate_B(_x)
                 e = self.plasma._interpolate_E(_x)
                 _boris_push(_x, _v, b, e, _hqmdt, _dt)
 
+                _boris_push(_x_for_double, _v_for_double, b, e, _hqmdt / 2, _dt/2)
+                b = self.plasma._interpolate_B(_x_for_double)
+                e = self.plasma._interpolate_E(_x_for_double)
+                _boris_push(_x_for_double, _v_for_double, b, e, _hqmdt / 2, _dt/2)
 
-                if True:
-                    timestep_info = dict(i = len(_times), dt = _dt, 
+                _x_error = np.linalg.norm(_x_for_double - _x, axis=-1).max()
+                _v_error = np.linalg.norm(_v_for_double - _v, axis=-1).max()
+                error = max([_x_error, _v_error])
+                _time += _dt
+
+                # xfactor = 0.9 * min([max([(tolerance/2/_x_error)**0.5, 0.6]), 1.4])
+                if error:
+                    xfactor = np.clip((tolerance/2/error)**0.5, 0.3, 2)
+                    _dt *= xfactor
+                    # _dt = np.clip(_dt, 1e-20, 1)
+                    timestep_info = dict(i = len(_times), dt = _dt, xfactor = xfactor, v_error = _v_error, x_error = _x_error,
+                                         toltoerr = tolerance / 2 / error,
                                          )
+                else:
+                    xfactor = 1
+                    timestep_info = dict(i = len(_times), dt = _dt, xfactor = xfactor, v_error = _v_error, x_error = _x_error,
+                                         )
+                # if np.linalg.norm(_x_error) > tolerance:
+                #     xfactor = 0.9 * min([max([(tolerance/2/np.linalg.norm(_x_error))**0.5, 0.3]), 2])
+                #     print(xfactor)
+
+                # print(timestep_info)
+
+                if error < tolerance:
+                    _x[...] = _x_for_double
+                    _v[...] = _v_for_double
 
                 _position_history.append(_x.copy())
                 _velocity_history.append(_v.copy())
