@@ -9,6 +9,7 @@ import numba
 import tqdm.auto
 import xarray
 import warnings
+import zarr
 
 from plasmapy import atomic, formulary
 from plasmapy.utils.decorators import check_units
@@ -317,7 +318,7 @@ class ParticleTracker:
         self._v = value.si.value
 
     @check_units()
-    def run(self, total_time: u.s, dt: u.s = None, progressbar = True):
+    def run(self, total_time: u.s, dt: u.s = None, progressbar = True, zarr_path = None):
         r"""
         Runs a simulation instance.
          dt: u.s = np.inf * u.s,
@@ -335,9 +336,10 @@ class ParticleTracker:
         _total_time = total_time.si.value
         _x = self._x.copy()
         _v = self._v.copy()
-        _time = 0
+        _time = 0.0
 
-        _times = [_time]
+        root = zarr.group(zarr_path)
+        _times = root.array("time", [_time], dtype=float)
         init_kinetic = self._kinetic_energy(_v)
         timestep_info = dict(i = len(_times), dt = _dt,
                              )
@@ -360,8 +362,10 @@ class ParticleTracker:
 
             _x = _x - _v * 0.5 * _dt
 
-            _position_history = [_x.copy()]
-            _velocity_history = [_v.copy()]
+
+            _position_history = root.array("position", _x.reshape(1, *_x.shape))
+            _velocity_history = root.array("velocity", _v.reshape(1, *_v.shape))
+            
             if progressbar:
                 pbar = tqdm.auto.tqdm(total=_total_time, unit="s")
             while _time < _total_time:
@@ -375,9 +379,9 @@ class ParticleTracker:
                     timestep_info = dict(i = len(_times), dt = _dt, 
                                          )
 
-                _position_history.append(_x.copy())
-                _velocity_history.append(_v.copy())
-                _times.append(_time)
+                _position_history.append(_x.reshape(1, *_x.shape))
+                _velocity_history.append(_v.reshape(1, *_v.shape))
+                _times.append([_time])
 
                 if init_kinetic:
                     reldelta = self._kinetic_energy(_v)/init_kinetic - 1

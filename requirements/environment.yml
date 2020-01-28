@@ -17,6 +17,7 @@ dependencies:
   - pip
   - vtk
   - xarray
+  - zarr
   - pip:
     - numpydoc
     - pytest
