@@ -23,6 +23,7 @@ __all__ = [
     "ParticleTrackerSolution",
 ]
 
+@profile
 @numba.njit(parallel = True)
 def _boris_push(x, v, b, e, hqmdt, dt):
     r"""
@@ -318,7 +319,8 @@ class ParticleTracker:
         self._v = value.si.value
 
     @check_units()
-    def run(self, total_time: u.s, dt: u.s = None, progressbar = True, zarr_path = None):
+    @profile
+    def run(self, total_time: u.s, dt: u.s = None, progressbar = True, zarr_path = None, chunk_size = 10000):
         r"""
         Runs a simulation instance.
          dt: u.s = np.inf * u.s,
@@ -339,7 +341,7 @@ class ParticleTracker:
         _time = 0.0
 
         root = zarr.group(zarr_path)
-        _times = root.array("time", [_time], dtype=float)
+        _times = root.array("time", [_time], dtype=float, chunks = chunk_size)
         init_kinetic = self._kinetic_energy(_v)
         timestep_info = dict(i = len(_times), dt = _dt,
                              )
@@ -363,8 +365,8 @@ class ParticleTracker:
             _x = _x - _v * 0.5 * _dt
 
 
-            _position_history = root.array("position", _x.reshape(1, *_x.shape))
-            _velocity_history = root.array("velocity", _v.reshape(1, *_v.shape))
+            _position_history = root.array("position", _x.reshape(1, *_x.shape), chunks = (chunk_size, *_x.shape))
+            _velocity_history = root.array("velocity", _v.reshape(1, *_v.shape), chunks = (chunk_size, *_v.shape))
             
             if progressbar:
                 pbar = tqdm.auto.tqdm(total=_total_time, unit="s")

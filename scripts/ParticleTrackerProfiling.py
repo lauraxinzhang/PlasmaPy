@@ -42,5 +42,5 @@ v = u.Quantity([[0, 1000, 100]], u.m/u.s)
 sim = simulation.ParticleTracker(c, x, v, 'e')
 
 def profile():
-    sim.run(dt=1e-8 * u.s, nt=1e5)
+    sim.run(1e-3 * u.s, dt=1e-8 * u.s)
 profile()
