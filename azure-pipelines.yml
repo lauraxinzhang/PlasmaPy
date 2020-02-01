@@ -72,7 +72,7 @@ jobs:
       # Only Upload to PyPI on tags
       ${{ if startsWith(variables['Build.SourceBranch'], 'refs/tags/') }}:
         pypi_connection_name : 'pypi_endpoint'
-      test_extras: 'all,test'
+      test_extras: 'dev'
       test_command: 'pytest --pyargs plasmapy'
       submodules: false
       targets:
