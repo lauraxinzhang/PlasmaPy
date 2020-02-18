@@ -10,6 +10,7 @@ from plasmapy import atomic, formulary
 from plasmapy.utils.decorators import check_units
 from plasmapy.utils import PhysicsError
 from plasmapy.atomic import particle_input, Particle
+from plasmapy.atomic.exceptions import InvalidParticleError
 import typing
 from . import particle_integrators
 
@@ -19,7 +20,7 @@ __all__ = ["ParticleTracker", "ParticleTrackerAccessor"]
 
 
 @check_units
-@particle_input
+# @particle_input
 def _create_xarray(
     position_history: u.m,
     velocity_history: u.m / u.s,
@@ -65,7 +66,15 @@ class ParticleTrackerAccessor:
     def __init__(self, xarray_obj, plasma=None):
         self._obj = xarray_obj
         self.plasma = plasma
-        self.particle = Particle(xarray_obj.attrs["particle"])
+        try:
+            self.particle = Particle(xarray_obj.attrs["particle"])
+        except InvalidParticleError:
+            from collections import namedtuple
+
+            CustomParticle = namedtuple("custom_particle", ["mass", "charge"])
+            particle = CustomParticle(
+                mass=1 * u.dimensionless_unscaled, charge=1 * u.dimensionless_unscaled
+            )
         # self.diagnostics = diagnostics # TODO put in xarray itself
 
     def vector_norm(self, array, dim, ord=None):
@@ -85,7 +94,7 @@ class ParticleTrackerAccessor:
         quantity_support()
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
-        for p_index in range(self.particle.size):
+        for p_index in range(self._obj.particle.size):
             r = self._obj.position.isel(particle=p_index)
             x, y, z = r.T
             ax.plot(x, y, z, *args, **kwargs)
@@ -141,7 +150,7 @@ class ParticleTrackerAccessor:
                 plt.show()
             raise PhysicsError("Kinetic energy is not conserved!")
 
-    def visualize(self, figure=None, particle=0):  # coverage: ignore
+    def visualize(self, figure=None, particle=0, stride=1):  # coverage: ignore
         """Plot the trajectory using PyVista."""
         # breakpoint()
         import pyvista as pv
@@ -151,8 +160,10 @@ class ParticleTrackerAccessor:
             fig.add_axes()
         else:
             fig = figure
-        points = self._obj.position.sel(particle=particle)  # .values
-        trajectory = spline = pv.Spline(points, max((1000, self._obj.sizes["time"])))
+        points = self._obj.position.sel(particle=particle)[::stride].values
+        trajectory = spline = pv.Spline(
+            points, max((1000, self._obj.sizes["time"] // 100))
+        )
         if self.plasma and hasattr(self.plasma, "visualize"):
             self.plasma.visualize(fig)
 
@@ -202,7 +213,7 @@ class ParticleTracker:
         # "zenitani": particle_integrators._zenitani,
     }
 
-    @atomic.particle_input
+    # @atomic.particle_input
     @check_units()
     def __init__(
         self,
