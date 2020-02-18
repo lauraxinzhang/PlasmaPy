@@ -25,7 +25,7 @@ def scalar_distance(r, distances, directions):
                     directions[particle_i, particle_j, dimension] /= scalar_distance
 
 
-def get_forces_python(r, forces, potentials):
+def get_forces_python(r, forces, potentials, A, B):
     number_particles, dimensionality = r.shape
     # assert (forces is not None) or (potentials is not None)
 
@@ -36,8 +36,8 @@ def get_forces_python(r, forces, potentials):
             if particle_i != particle_j:
                 square_distance = np.sum((r[particle_i] - r[particle_j]) ** 2)
                 assert square_distance > 0
-                repulsive_part = square_distance ** -3
-                attractive_part = repulsive_part ** 2
+                repulsive_part = B * square_distance ** -3
+                attractive_part = A * square_distance ** -6
 
                 if forces is not None:
                     force_term = 2 * attractive_part - repulsive_part
@@ -93,36 +93,47 @@ class InterParticleForces(GenericPlasma):
     def __init__(
         self,
         mechanism: ["python", "njit", "njit_parallel", "njit_cuda"],
+        potential_well_depth: float,
+        zero_distance: float,
         box_L: float,
         box_constant: float,
         box_exponent: float = 2,
     ):
+        self.potential_well_depth = potential_well_depth
+        self.zero_distance = zero_distance
         self.mechanism = mechanism
+        self.A = 4 * potential_well_depth * zero_distance ** 12
+        self.B = 4 * potential_well_depth * zero_distance ** 6
         self.box_L = box_L
         self.box_constant = box_constant
         self.box_exponent = box_exponent
+        self.forces = None
+        self.potentials = None
 
-    def _interpolate_E(
-        self, r: np.ndarray, forces: np.ndarray = None, potentials: np.ndarray = None
-    ):
+    def _interpolate_E(self, r: np.ndarray):
         number_particles, dimensionality = r.shape
-        if forces is None:
-            forces = np.zeros_like(
+        if self.forces is None:
+            self.forces = np.zeros_like(
                 r
             )  # TODO handle dtype - should be preallocated anyway for cuda so it's fine
-        else:
-            forces[...] = 0.0
+        # else:
+        #     self.forces[...] = 0.0
 
-        if potentials is None:
-            potentials = np.zeros(number_particles, dtype=float)
-        else:
-            potentials[...] = 0.0
+        if self.potentials is None:
+            self.potentials = np.zeros(number_particles, dtype=float)
+        # else:
+        #     self.potentials[...] = 0.0
 
-        calculators[self.mechanism](r, forces, potentials)
+        calculators[self.mechanism](r, self.forces, self.potentials, self.A, self.B)
         wall_forces[self.mechanism](
-            r, forces, potentials, self.box_L, self.box_constant, self.box_exponent
+            r,
+            self.forces,
+            self.potentials,
+            self.box_L,
+            self.box_constant,
+            self.box_exponent,
         )
-        return forces
+        return self.forces
 
     def interpolate_E(self, r: u.m):
         return u.Quantity(self._interpolate_E(r.si.value), E_unit)
