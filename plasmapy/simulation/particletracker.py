@@ -30,6 +30,7 @@ def _create_xarray(
     timesteps: u.s,
     particle: Particle,
     dimensions="xyz",
+    potentials=None,
 ):
     data_vars = {}
     assert position_history.shape == velocity_history.shape
@@ -41,6 +42,7 @@ def _create_xarray(
     data_vars["timestep"] = (("time",), timesteps)
     kinetic_energy = (velocity_history ** 2).sum(axis=-1) * particle.mass / 2
     data_vars["kinetic_energy"] = (("time", "particle"), kinetic_energy)
+    data_vars["potential_energy"] = (("time", "particle"), potentials)
 
     data = xarray.Dataset(
         data_vars=data_vars,
@@ -54,6 +56,7 @@ def _create_xarray(
         ("E", e_history),
         ("timestep", timesteps),
         ("kinetic_energy", kinetic_energy),
+        ("potential_energy", potentials),
     ]:
         data[index].attrs["unit"] = str(quantity.unit)
 
@@ -322,6 +325,10 @@ class ParticleTracker:
             _velocity_history = [_v.copy()]
             _b_history = [b.copy()]
             _e_history = [e.copy()]
+            if hasattr(self.plasma, "potentials"):
+                potential_history = [self.plasma.potentials.copy()]
+            else:
+                potential_history = None
             if progressbar:
                 pbar = tqdm.auto.tqdm(
                     total=progressbar_steps,
@@ -335,7 +342,7 @@ class ParticleTracker:
                 e = self.plasma._interpolate_E(_x)
                 integrator(_x, _v, b, e, _q, _m, _dt)
                 if hasattr(self.plasma, "_drag"):
-                    self.plasma._drag(_r, _v)
+                    self.plasma._drag(_x, _v)
 
                 # todo should be a list of dicts, probably)
                 if _time > next_snapshot_update_time:
@@ -344,6 +351,8 @@ class ParticleTracker:
                     _velocity_history.append(_v.copy())
                     _b_history.append(b.copy())
                     _e_history.append(e.copy())
+                    if hasattr(self.plasma, "potentials"):
+                        potential_history.append(self.plasma.potentials.copy())
                     _times.append(_time)
                     _timesteps.append(_dt)
 
@@ -369,6 +378,7 @@ class ParticleTracker:
             u.Quantity(_e_history, u.V / u.m),
             u.Quantity(_timesteps, u.s),
             self.particle,
+            potentials=u.Quantity(potential_history, u.J),
         )
         return solution
 
