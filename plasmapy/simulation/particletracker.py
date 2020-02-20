@@ -334,6 +334,8 @@ class ParticleTracker:
                 b = self.plasma._interpolate_B(_x)
                 e = self.plasma._interpolate_E(_x)
                 integrator(_x, _v, b, e, _q, _m, _dt)
+                if hasattr(self.plasma, "_drag"):
+                    self.plasma._drag(_r, _v)
 
                 # todo should be a list of dicts, probably)
                 if _time > next_snapshot_update_time:

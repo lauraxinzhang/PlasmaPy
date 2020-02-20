@@ -89,6 +89,28 @@ wall_forces = {
 }
 
 
+def wall_collision(r, v, box_L):
+    number_particles, dimensionality = r.shape
+    for particle_i in numba.prange(number_particles):
+        x, y, z = r[particle_i]
+        if not (0 < x < box_L):
+            v[particle_i, 0] *= -1
+        if not (0 < y < box_L):
+            v[particle_i, 1] *= -1
+        if not (0 < z < box_L):
+            v[particle_i, 2] *= -1
+
+
+wall_collision_njit = numba.njit()(wall_collision)
+wall_collision_njit_parallel = numba.njit(parallel=True)(wall_collision)
+
+wall_collisions = {
+    "python": wall_collision,
+    "njit": wall_collision_njit,
+    "njit_parallel": wall_collision_njit_parallel,
+}
+
+
 class InterParticleForces(GenericPlasma):
     def __init__(
         self,
@@ -125,14 +147,6 @@ class InterParticleForces(GenericPlasma):
         #     self.potentials[...] = 0.0
 
         calculators[self.mechanism](r, self.forces, self.potentials, self.A, self.B)
-        wall_forces[self.mechanism](
-            r,
-            self.forces,
-            self.potentials,
-            self.box_L,
-            self.box_constant,
-            self.box_exponent,
-        )
         return self.forces
 
     def interpolate_E(self, r: u.m):
@@ -143,3 +157,6 @@ class InterParticleForces(GenericPlasma):
 
     def interpolate_B(self, r: u.m):
         return u.Quantity(self._interpolate_B(r.si.value), u.T)
+
+    def _drag(self, r: np.ndarray, v: np.ndarray):
+        wall_collisions[self.mechanism](r, v, self.box_L)
