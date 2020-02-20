@@ -316,6 +316,8 @@ class ParticleTracker:
         with np.errstate(all="raise"):
             b = self.plasma._interpolate_B(_x)
             e = self.plasma._interpolate_E(_x)
+            if hasattr(self.plasma, "_drag"):
+                self.plasma._drag(_x, _v)
 
             integrator(
                 _x.copy(), _v, b, e, _q, _m, -0.5 * _dt
@@ -340,9 +342,9 @@ class ParticleTracker:
                 i += 1
                 b = self.plasma._interpolate_B(_x)
                 e = self.plasma._interpolate_E(_x)
-                integrator(_x, _v, b, e, _q, _m, _dt)
                 if hasattr(self.plasma, "_drag"):
                     self.plasma._drag(_x, _v)
+                integrator(_x, _v, b, e, _q, _m, _dt)
 
                 # todo should be a list of dicts, probably)
                 if _time > next_snapshot_update_time:

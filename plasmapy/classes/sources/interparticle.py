@@ -61,7 +61,7 @@ def add_wall_forces_python(r, forces, potentials, L, constant, exponent=2):
         R = r[particle_i]
         for i in range(3):
             if R[i] < 0:
-                forces[particle_i, i] += constant * R[i] ** exponent
+                forces[particle_i, i] -= constant * R[i] ** exponent
                 potentials[particle_i] += constant * R[i] ** (exponent + 1) / exponent
             elif R[i] > L:
                 forces[particle_i, i] -= constant * (R[i] - L) ** exponent
@@ -147,6 +147,14 @@ class InterParticleForces(GenericPlasma):
         #     self.potentials[...] = 0.0
 
         calculators[self.mechanism](r, self.forces, self.potentials, self.A, self.B)
+        wall_forces[self.mechanism](
+            r,
+            self.forces,
+            self.potentials,
+            self.box_L,
+            self.box_constant,
+            self.box_exponent,
+        )
         return self.forces
 
     def interpolate_E(self, r: u.m):
@@ -159,4 +167,5 @@ class InterParticleForces(GenericPlasma):
         return u.Quantity(self._interpolate_B(r.si.value), u.T)
 
     def _drag(self, r: np.ndarray, v: np.ndarray):
-        wall_collisions[self.mechanism](r, v, self.box_L)
+        # wall_collisions[self.mechanism](r, v, self.box_L)
+        pass
