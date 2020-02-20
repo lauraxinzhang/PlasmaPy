@@ -267,6 +267,7 @@ class ParticleTracker:
         progressbar=True,
         pusher="explicit_boris",
         progressbar_steps=100,
+        snapshot_steps=1000,
     ):
         r"""Run a simulation instance.
 
@@ -291,14 +292,17 @@ class ParticleTracker:
         _total_time = total_time.si.value
         _time = 0.0
         _progressbar_timestep = _total_time / progressbar_steps
+        _snapshot_timestep = _total_time / snapshot_steps
         next_progressbar_update_time = _time + _progressbar_timestep
+        next_snapshot_update_time = _time + _snapshot_timestep
         _times = [_time]
         _timesteps = [_dt]
         _x = self.x.si.value.copy()
         _v = self.v.si.value.copy()
+        i = 0
 
         init_kinetic = self.kinetic_energy(_v, _m)
-        timestep_info = dict(i=len(_times), dt=_dt)
+        timestep_info = dict(i=i, dt=_dt)
         if init_kinetic:
             reldelta = self.kinetic_energy(_v, _m) / init_kinetic - 1
             kinetic_info = {"Relative kinetic energy change": reldelta}
@@ -319,24 +323,31 @@ class ParticleTracker:
             _b_history = [b.copy()]
             _e_history = [e.copy()]
             if progressbar:
-                pbar = tqdm.auto.tqdm(total=progressbar_steps)
+                pbar = tqdm.auto.tqdm(
+                    total=progressbar_steps,
+                    bar_format="{l_bar}{bar}| [{elapsed}<{remaining}, "
+                    "{rate_fmt}{postfix}]",
+                )
             while _time < _total_time:
                 _time += _dt
+                i += 1
                 b = self.plasma._interpolate_B(_x)
                 e = self.plasma._interpolate_E(_x)
                 integrator(_x, _v, b, e, _q, _m, _dt)
 
                 # todo should be a list of dicts, probably)
-                _position_history.append(_x.copy())
-                _velocity_history.append(_v.copy())
-                _b_history.append(b.copy())
-                _e_history.append(e.copy())
-                _times.append(_time)
-                _timesteps.append(_dt)
+                if _time > next_snapshot_update_time:
+                    next_snapshot_update_time += _snapshot_timestep
+                    _position_history.append(_x.copy())
+                    _velocity_history.append(_v.copy())
+                    _b_history.append(b.copy())
+                    _e_history.append(e.copy())
+                    _times.append(_time)
+                    _timesteps.append(_dt)
 
                 if progressbar and _time > next_progressbar_update_time:
                     next_progressbar_update_time += _progressbar_timestep
-                    diagnostics = dict(i=len(_times), dt=_dt)
+                    diagnostics = dict(i=i, dt=_dt)
                     if init_kinetic:
                         reldelta = self.kinetic_energy(_v, _m) / init_kinetic - 1
                         diagnostics["Relative kinetic energy change"] = reldelta
