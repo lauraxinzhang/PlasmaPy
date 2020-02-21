@@ -55,18 +55,22 @@ def get_forces_python(r, forces, potentials, A, B):
             potentials[particle_i] = potential_on_i
 
 
-def add_wall_forces_python(r, forces, potentials, L, constant, exponent=2):
+def add_wall_forces_python(r, forces, potentials, L, constant, scale, exponent=2):
     number_particles, dimensionality = r.shape
     for particle_i in numba.prange(number_particles):
         R = r[particle_i]
         for i in range(3):
             if R[i] < 0:
-                forces[particle_i, i] -= constant * R[i] ** exponent
-                potentials[particle_i] += constant * R[i] ** (exponent + 1) / exponent
-            elif R[i] > L:
-                forces[particle_i, i] -= constant * (R[i] - L) ** exponent
+                scaled_distance = R[i] / scale
+                forces[particle_i, i] -= constant * scaled_distance ** exponent
                 potentials[particle_i] += (
-                    constant * (R[i] - L) ** (exponent + 1) / exponent
+                    constant * scaled_distance ** (exponent + 1) / exponent
+                )
+            elif R[i] > L:
+                scaled_distance = (R[i] - L) / scale
+                forces[particle_i, i] -= constant * scaled_distance ** exponent
+                potentials[particle_i] += (
+                    constant * scaled_distance ** (exponent + 1) / exponent
                 )
 
 
@@ -119,6 +123,7 @@ class InterParticleForces(GenericPlasma):
         zero_distance: float,
         box_L: float,
         box_constant: float,
+        box_force_scale: float,
         box_exponent: float = 2,
     ):
         self.potential_well_depth = potential_well_depth
@@ -128,6 +133,7 @@ class InterParticleForces(GenericPlasma):
         self.B = 4 * potential_well_depth * zero_distance ** 6
         self.box_L = box_L
         self.box_constant = box_constant
+        self.box_force_scale = box_force_scale
         self.box_exponent = box_exponent
         self.forces = None
         self.potentials = None
@@ -153,6 +159,7 @@ class InterParticleForces(GenericPlasma):
             self.potentials,
             self.box_L,
             self.box_constant,
+            self.box_force_scale,
             self.box_exponent,
         )
         return self.forces
