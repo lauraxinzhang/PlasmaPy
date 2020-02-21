@@ -31,11 +31,10 @@ class ParticleTrackerAccessor:
             from collections import namedtuple
 
             CustomParticle = namedtuple("custom_particle", ["mass", "charge"])
-            particle = CustomParticle(
+            self.particle = CustomParticle(
                 mass=1 * u.dimensionless_unscaled, charge=1 * u.dimensionless_unscaled
             )
         # TODO handle CustomParticles on the `Particle` layer!
-        self.particle = Particle(xarray_obj.attrs["particle"])
         # self.diagnostics = diagnostics # TODO put in xarray itself
 
     def vector_norm(self, array, dim, ord=None):
@@ -191,7 +190,7 @@ class ParticleTrackerAccessor:
                 .values
             )
             point_cloud = pv.PolyData(points)
-            point_cloud.abs_vel = np.linalg.norm(velocities, axis=1)
+            point_cloud.abs_vel = np.linalg.norm(velocities, axis=1, keepdims=True)
             point_cloud.vectors = velocities / (10 * point_cloud.abs_vel)
             fig.add_mesh(point_cloud.arrows, show_scalar_bar=False)
             fig.write_frame()

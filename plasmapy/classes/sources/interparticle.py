@@ -169,3 +169,19 @@ class InterParticleForces(GenericPlasma):
     def _drag(self, r: np.ndarray, v: np.ndarray):
         # wall_collisions[self.mechanism](r, v, self.box_L)
         pass
+
+    def visualize(self, figure=None):  # coverage: ignore
+        import pyvista as pv
+
+        if figure is None:
+            fig = pv.Plotter(notebook=True)
+        else:
+            fig = figure
+
+        L = self.box_L
+        fig.add_mesh(pv.Cube(bounds=(0, L, 0, L, 0, L)), opacity=0.1)
+
+        if figure is None:
+            fig.show()
+
+        return fig
