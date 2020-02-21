@@ -5,6 +5,7 @@ import tqdm.auto
 import xarray
 import warnings
 import matplotlib.pyplot as plt
+import pathlib
 
 from plasmapy import atomic, formulary
 from plasmapy.utils.decorators import check_units
@@ -17,51 +18,6 @@ from . import particle_integrators
 PLOTTING = False
 
 __all__ = ["ParticleTracker", "ParticleTrackerAccessor"]
-
-
-@check_units
-# @particle_input
-def _create_xarray(
-    position_history: u.m,
-    velocity_history: u.m / u.s,
-    times: u.s,
-    b_history: u.T,
-    e_history: u.V / u.m,
-    timesteps: u.s,
-    particle: Particle,
-    dimensions="xyz",
-    potentials=None,
-):
-    data_vars = {}
-    assert position_history.shape == velocity_history.shape
-    particles = range(position_history.shape[1])
-    data_vars["position"] = (("time", "particle", "dimension"), position_history)
-    data_vars["velocity"] = (("time", "particle", "dimension"), velocity_history)
-    data_vars["B"] = (("time", "particle", "dimension"), b_history)
-    data_vars["E"] = (("time", "particle", "dimension"), e_history)
-    data_vars["timestep"] = (("time",), timesteps)
-    kinetic_energy = (velocity_history ** 2).sum(axis=-1) * particle.mass / 2
-    data_vars["kinetic_energy"] = (("time", "particle"), kinetic_energy)
-    data_vars["potential_energy"] = (("time", "particle"), potentials)
-
-    data = xarray.Dataset(
-        data_vars=data_vars,
-        coords={"time": times, "particle": particles, "dimension": list(dimensions)},
-    )
-    for index, quantity in [
-        ("position", position_history),
-        ("velocity", velocity_history),
-        ("time", times),
-        ("B", b_history),
-        ("E", e_history),
-        ("timestep", timesteps),
-        ("kinetic_energy", kinetic_energy),
-        ("potential_energy", potentials),
-    ]:
-        data[index].attrs["unit"] = str(quantity.unit)
-
-    data.attrs["particle"] = str(particle)
-    return data
 
 
 @xarray.register_dataset_accessor("particletracker")
@@ -78,6 +34,8 @@ class ParticleTrackerAccessor:
             particle = CustomParticle(
                 mass=1 * u.dimensionless_unscaled, charge=1 * u.dimensionless_unscaled
             )
+        # TODO handle CustomParticles on the `Particle` layer!
+        self.particle = Particle(xarray_obj.attrs["particle"])
         # self.diagnostics = diagnostics # TODO put in xarray itself
 
     def vector_norm(self, array, dim, ord=None):
@@ -155,7 +113,6 @@ class ParticleTrackerAccessor:
 
     def visualize(self, figure=None, particle=0, stride=1):  # coverage: ignore
         """Plot the trajectory using PyVista."""
-        # breakpoint()
         import pyvista as pv
 
         if figure is None:
@@ -176,6 +133,73 @@ class ParticleTrackerAccessor:
         else:
             fig.add_mesh(trajectory)
         return fig
+
+    def animate(
+        self,
+        filename: pathlib.Path,
+        particles=(0,),
+        nframes: int = 50,
+        plasma=None,
+        notebook_display=False,
+    ):
+        import pyvista as pv
+
+        fig = pv.Plotter(off_screen=True)
+        fig.open_movie(str(filename))
+        if plasma is not None:
+            if hasattr(plasma, "visualize"):
+                plasma.visualize(fig)
+            else:
+                warnings.warn(
+                    f"Plasma object {plasma} passed to animate, but it has no visualize method!"
+                )
+                raise ValueError(
+                    f"Plasma object {plasma} passed to animate, but it has no visualize method!"
+                )
+        fig.show(auto_close=False)
+        fig.write_frame()
+        for i in tqdm.auto.trange(1, nframes):
+            fig.clear()
+            if plasma is not None:
+                if hasattr(plasma, "visualize"):
+                    plasma.visualize(fig)
+                else:
+                    warnings.warn(
+                        f"Plasma object {plasma} passed to animate, but it has no visualize method!"
+                    )
+                    raise ValueError(
+                        f"Plasma object {plasma} passed to animate, but it has no visualize method!"
+                    )
+            frame_max = self._obj.sizes["time"] // nframes * i
+            for particle in particles:
+                trajectories = (
+                    self._obj.position.sel(particle=particle)
+                    .isel(time=range(0, frame_max + 1))
+                    .values
+                )
+                trajectory = pv.Spline(trajectories)
+                fig.add_mesh(trajectory)
+
+            points = (
+                self._obj.position.sel(particle=list(particles))
+                .isel(time=frame_max)
+                .values
+            )
+            velocities = (
+                self._obj.velocity.sel(particle=list(particles))
+                .isel(time=frame_max)
+                .values
+            )
+            point_cloud = pv.PolyData(points)
+            point_cloud.abs_vel = np.linalg.norm(velocities, axis=1)
+            point_cloud.vectors = velocities / (10 * point_cloud.abs_vel)
+            fig.add_mesh(point_cloud.arrows, show_scalar_bar=False)
+            fig.write_frame()
+        fig.close()
+        if notebook_display:
+            from IPython.display import Video, display
+
+            display(Video(str(filename), embed=True))
 
 
 class ParticleTracker:
@@ -212,8 +236,8 @@ class ParticleTracker:
     integrators = {
         "explicit_boris": particle_integrators._boris_push,
         "implicit_boris": particle_integrators._boris_push_implicit,
-        # "implicit_boris2": particle_integrators._boris_push_implicit2,
-        # "zenitani": particle_integrators._zenitani,
+        "implicit_boris2": particle_integrators._boris_push_implicit2,
+        "zenitani": particle_integrators._zenitani,
     }
 
     # @atomic.particle_input
@@ -269,7 +293,6 @@ class ParticleTracker:
         dt: u.s = None,
         progressbar=True,
         pusher="explicit_boris",
-        progressbar_steps=100,
         snapshot_steps=1000,
     ):
         r"""Run a simulation instance.
@@ -294,9 +317,7 @@ class ParticleTracker:
 
         _total_time = total_time.si.value
         _time = 0.0
-        _progressbar_timestep = _total_time / progressbar_steps
         _snapshot_timestep = _total_time / snapshot_steps
-        next_progressbar_update_time = _time + _progressbar_timestep
         next_snapshot_update_time = _time + _snapshot_timestep
         _times = [_time]
         _timesteps = [_dt]
@@ -327,13 +348,15 @@ class ParticleTracker:
             _velocity_history = [_v.copy()]
             _b_history = [b.copy()]
             _e_history = [e.copy()]
-            if hasattr(self.plasma, "potentials"):
+            if hasattr(
+                self.plasma, "potentials"
+            ):  # FIXME this is a hack for inter-particle interactions
                 potential_history = [self.plasma.potentials.copy()]
             else:
                 potential_history = None
             if progressbar:
                 pbar = tqdm.auto.tqdm(
-                    total=progressbar_steps,
+                    total=snapshot_steps,
                     bar_format="{l_bar}{bar}| [{elapsed}<{remaining}, "
                     "{rate_fmt}{postfix}]",
                 )
@@ -357,30 +380,30 @@ class ParticleTracker:
                         potential_history.append(self.plasma.potentials.copy())
                     _times.append(_time)
                     _timesteps.append(_dt)
-
-                if progressbar and _time > next_progressbar_update_time:
-                    next_progressbar_update_time += _progressbar_timestep
-                    diagnostics = dict(i=i, dt=_dt)
-                    if init_kinetic:
-                        reldelta = self.kinetic_energy(_v, _m) / init_kinetic - 1
-                        diagnostics["Relative kinetic energy change"] = reldelta
-                    else:
-                        delta = self.kinetic_energy(_v, _m)
-                        diagnostics["Kinetic energy change"] = delta
-                    pbar.set_postfix(diagnostics)
-                    pbar.update()
+                    if progressbar:
+                        diagnostics = dict(i=i, dt=_dt)
+                        if init_kinetic:
+                            reldelta = self.kinetic_energy(_v, _m) / init_kinetic - 1
+                            diagnostics["Relative kinetic energy change"] = reldelta
+                        else:
+                            delta = self.kinetic_energy(_v, _m)
+                            diagnostics["Kinetic energy change"] = delta
+                        pbar.set_postfix(diagnostics)
+                        pbar.update()
         if progressbar:
             pbar.close()
 
-        solution = _create_xarray(
+        solution = self._create_xarray(
             u.Quantity(_position_history, u.m),
             u.Quantity(_velocity_history, u.m / u.s),
             u.Quantity(_times, u.s),
             u.Quantity(_b_history, u.T),
             u.Quantity(_e_history, u.V / u.m),
             u.Quantity(_timesteps, u.s),
-            self.particle,
-            potentials=u.Quantity(potential_history, u.J),
+            total_iterations=i,
+            potentials=u.Quantity(potential_history, u.J)
+            if potential_history is not None
+            else None,
         )
         return solution
 
@@ -399,3 +422,54 @@ class ParticleTracker:
 
     def __str__(self):  # coverage: ignore
         return f"{self.N} {self.name} with " f"q = {self.q:.2e}, m = {self.m:.2e}"
+
+    @check_units
+    def _create_xarray(
+        self,
+        position_history: u.m,
+        velocity_history: u.m / u.s,
+        times: u.s,
+        b_history: u.T,
+        e_history: u.V / u.m,
+        timesteps: u.s,
+        total_iterations: int,
+        dimensions="xyz",
+        potentials=None,
+    ):
+        data_vars = {}
+        assert position_history.shape == velocity_history.shape
+        particles = range(position_history.shape[1])
+        data_vars["position"] = (("time", "particle", "dimension"), position_history)
+        data_vars["velocity"] = (("time", "particle", "dimension"), velocity_history)
+        data_vars["B"] = (("time", "particle", "dimension"), b_history)
+        data_vars["E"] = (("time", "particle", "dimension"), e_history)
+        data_vars["timestep"] = (("time",), timesteps)
+        kinetic_energy = (velocity_history ** 2).sum(axis=-1) * self.particle.mass / 2
+        data_vars["kinetic_energy"] = (("time", "particle"), kinetic_energy)
+        if potentials is not None:
+            data_vars["potential_energy"] = (("time", "particle"), potentials)
+
+        data = xarray.Dataset(
+            data_vars=data_vars,
+            coords={
+                "time": times,
+                "particle": particles,
+                "dimension": list(dimensions),
+            },
+        )
+        for index, quantity in [
+            ("position", position_history),
+            ("velocity", velocity_history),
+            ("time", times),
+            ("B", b_history),
+            ("E", e_history),
+            ("timestep", timesteps),
+            ("kinetic_energy", kinetic_energy),
+            ("potential_energy", potentials),
+        ]:
+            if index in data:
+                data[index].attrs["unit"] = str(quantity.unit)
+
+        data.attrs["particle"] = str(self.particle)
+        data.attrs["total_iterations"] = total_iterations
+        return data
