@@ -26,13 +26,10 @@ def scalar_distance(r, distances, directions):
 
 
 def get_forces_python(r, forces, potentials, A, B):
-    number_particles, dimensionality = r.shape
-    # assert (forces is not None) or (potentials is not None)
-
-    for particle_i in numba.prange(number_particles):
-        force_on_i = np.zeros(dimensionality)
+    for particle_i in numba.prange(r.shape[0]):
+        force_on_i = np.zeros(r.shape[1])
         potential_on_i = 0.0
-        for particle_j in range(number_particles):
+        for particle_j in range(r.shape[0]):
             if particle_i != particle_j:
                 square_distance = np.sum((r[particle_i] - r[particle_j]) ** 2)
                 assert square_distance > 0
@@ -46,8 +43,6 @@ def get_forces_python(r, forces, potentials, A, B):
                     )
                 if potentials is not None:
                     potential_on_i += 2 * (attractive_part - repulsive_part)
-                # if distances is not None:
-                #     distances[particle_i, particle_j] = math.sqrt(square_distance)
 
         if forces is not None:
             forces[particle_i] = 24 * force_on_i
@@ -56,8 +51,7 @@ def get_forces_python(r, forces, potentials, A, B):
 
 
 def add_wall_forces_python(r, forces, potentials, L, constant, scale, exponent=2):
-    number_particles, dimensionality = r.shape
-    for particle_i in numba.prange(number_particles):
+    for particle_i in numba.prange(len(r)):
         R = r[particle_i]
         for i in range(3):
             if R[i] < 0:
