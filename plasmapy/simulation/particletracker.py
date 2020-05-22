@@ -1,28 +1,32 @@
 """Class representing a group of particles moving in a plasma's fields."""
+
+__all__ = ["ParticleTracker", "ParticleTrackerAccessor"]
+
+import pathlib
+import warnings
+from typing import Iterable, Union
+
 import numpy as np
-from astropy import units as u
 import tqdm.auto
 import xarray
-import warnings
-import matplotlib.pyplot as plt
-import pathlib
-
-from plasmapy import atomic, formulary
-from plasmapy.utils.decorators import check_units
-from plasmapy.utils import PhysicsError
-from plasmapy.atomic import particle_input, Particle
+from astropy import units as u
+from plasmapy import formulary, particles
 from plasmapy.atomic.exceptions import InvalidParticleError
-import typing
+from plasmapy.classes import BasePlasma
+from plasmapy.particles import Particle, particle_input
+from plasmapy.utils import PhysicsError
+from plasmapy.utils.decorators import check_units
+
 from . import particle_integrators
 
 PLOTTING = False
 
-__all__ = ["ParticleTracker", "ParticleTrackerAccessor"]
-
 
 @xarray.register_dataset_accessor("particletracker")
 class ParticleTrackerAccessor:
-    def __init__(self, xarray_obj, plasma=None):
+    """Custom accessor for PlasmaPy particle simulations."""
+
+    def __init__(self, xarray_obj: xarray.Dataset):
         self._obj = xarray_obj
         self.plasma = plasma
         try:
@@ -35,14 +39,24 @@ class ParticleTrackerAccessor:
                 mass=1 * u.dimensionless_unscaled, charge=1 * u.dimensionless_unscaled
             )
         # TODO handle CustomParticles on the `Particle` layer!
-        # self.diagnostics = diagnostics # TODO put in xarray itself
+        self.particle = particles.Particle(xarray_obj.attrs["particle"])
 
-    def vector_norm(self, array, dim, ord=None):
+    def vector_norm(self, array: xarray.DataArray, order: int = None):
+        """
+        Calculates the norm of a vector quantity.
+
+        Parameters
+        ----------
+        array : xarray.DataArray
+            Array to calculate vector norm of.
+        order : int
+            Order of vector norm passed to numpy.linalg.norm
+        """
         return xarray.apply_ufunc(
             np.linalg.norm,
             self._obj[array],
-            input_core_dims=[[dim]],
-            kwargs={"ord": ord, "axis": -1},
+            input_core_dims=[["dimension"]],
+            kwargs={"ord": order, "axis": -1},
         )
 
     def plot_trajectories(self, *args, **kwargs):  # coverage: ignore
@@ -53,14 +67,14 @@ class ParticleTrackerAccessor:
 
         quantity_support()
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection="3d")
+        axis = fig.add_subplot(111, projection="3d")
         for p_index in range(self._obj.particle.size):
             r = self._obj.position.isel(particle=p_index)
             x, y, z = r.T
-            ax.plot(x, y, z, *args, **kwargs)
-        ax.set_xlabel("$x$ position")
-        ax.set_ylabel("$y$ position")
-        ax.set_zlabel("$z$ position")
+            axis.plot(x, y, z, *args, **kwargs)
+        axis.set_xlabel("$x$ position")
+        axis.set_ylabel("$y$ position")
+        axis.set_zlabel("$z$ position")
         plt.show()
 
     def plot_time_trajectories(self, plot="xyz"):  # coverage: ignore
@@ -78,39 +92,34 @@ class ParticleTrackerAccessor:
         from mpl_toolkits.mplot3d import Axes3D
 
         quantity_support()
-        fig, ax = plt.subplots()
+        fig, axis = plt.subplots()
         for p_index in range(self._obj.particle.size):
             r = self._obj.position.isel(particle=p_index)
             x, y, z = r.T
             if "x" in plot:
-                ax.plot(self._obj.time, x, label=f"x_{p_index}")
+                axis.plot(self._obj.time, x, label=f"x_{p_index}")
             if "y" in plot:
-                ax.plot(self._obj.time, y, label=f"y_{p_index}")
+                axis.plot(self._obj.time, y, label=f"y_{p_index}")
             if "z" in plot:
-                ax.plot(self._obj.time, z, label=f"z_{p_index}")
-        # ax.set_title(self.name)
-        ax.legend(loc="best")
-        ax.grid()
-        ax.set_xlabel(f"Time $t$ [{u.s}]")
-        ax.set_ylabel(f"Position [{u.m}]")
+                axis.plot(self._obj.time, z, label=f"z_{p_index}")
+        axis.legend(loc="best")
+        axis.grid()
+        axis.set_xlabel(f"Time $t$ [{u.s}]")
+        axis.set_ylabel(f"Position [{u.m}]")
         plt.show()
 
-    def test_kinetic_energy(self, cutoff=2):
+    def test_kinetic_energy(self, rtol=1e-7, atol=0):
         r"""Test conservation of kinetic energy."""
-        difference = self._obj.kinetic_energy - self._obj.kinetic_energy.mean(
-            dim="time"
-        )
-        scaled = difference / self._obj.kinetic_energy.std(dim="time")
-        conservation = abs(scaled) < cutoff
-        if not conservation.all():
-            if PLOTTING:
-                import matplotlib.pyplot as plt
+        assert np.allclose(
+            self._obj.kinetic_energy,
+            self._obj.kinetic_energy.isel(time=0),
+            rtol=rtol,
+            atol=atol,
+        ), "Kinetic energy is not conserved!"
 
-                self._obj.kinetic_energy.plot.line()
-                plt.show()
-            raise PhysicsError("Kinetic energy is not conserved!")
-
-    def visualize(self, figure=None, particle=0, stride=1):  # coverage: ignore
+    def visualize(
+        self, figure=None, particles=(0,), stride=1, plasma=None, name=None
+    ):  # coverage: ignore
         """Plot the trajectory using PyVista."""
         import pyvista as pv
 
@@ -119,29 +128,64 @@ class ParticleTrackerAccessor:
             fig.add_axes()
         else:
             fig = figure
-        points = self._obj.position.sel(particle=particle)[::stride].values
-        trajectory = spline = pv.Spline(
-            points, max((1000, self._obj.sizes["time"] // 100))
-        )
-        if self.plasma and hasattr(self.plasma, "visualize"):
-            self.plasma.visualize(fig)
+        for i in particles:
+            points = self._obj.position.sel(particle=i)[::stride].values
+            trajectory = pv.Spline(
+                points,
+                max((1000, self._obj.sizes["time"] // 100)),  # TODO clean this up!
+            )
+            fig.add_mesh(trajectory, name=name)
 
-        if figure is None:
-            trajectory.plot(fig)
-            fig.show()
-        else:
-            fig.add_mesh(trajectory)
+        if plasma is not None:
+            if hasattr(plasma, "visualize"):
+                plasma.visualize(fig)
+            else:
+                warnings.warn(
+                    f"Your plasma={plasma} has no `visualize` method, there's nothing to display!"
+                )
+
         return fig
 
     def animate(
         self,
-        filename: pathlib.Path,
-        particles=(0,),
+        filename: Union[str, pathlib.Path],
+        particles: Iterable[int] = None,
         nframes: int = 50,
-        plasma=None,
-        notebook_display=False,
+        plasma: BasePlasma = None,
+        notebook_display: bool = False,
+        plot_trajectories: bool = True,
+        plot_arrows: bool = True,
     ):
+        """
+        Produces a 3D animation of particle trajectories using the pyvista library.
+
+        Parameters
+        ----------
+
+        filename: str or pathlib.Path
+            File path for the saved animation (.mp4).
+        particles: iterable of int
+            indices of particles to display. By default, displays all particles.
+            This may be resource intensive.
+        nframes: int
+            Number of frames to display. By default, 50.
+        plasma: `plasmapy.classes.BasePlasma`
+            Optional plasmapy Plasma object; if it has a `visualize` method,
+            that is used to display the environment the particles move in
+        notebook_display: bool
+            If True, displays the animation from the saved file.
+            Use for interactive work in Jupyter notebooks.
+        plot_trajectories: bool
+            If True, draws trajectories as curves.
+        plot_arrows: bool
+            If True, draws arrows representing current particle positions
+            and velocities.
+
+        """
         import pyvista as pv
+
+        if particles is None:
+            particles = (0,)
 
         fig = pv.Plotter(off_screen=True)
         fig.open_movie(str(filename))
@@ -152,11 +196,16 @@ class ParticleTrackerAccessor:
                 warnings.warn(
                     f"Plasma object {plasma} passed to animate, but it has no visualize method!"
                 )
-                raise ValueError(
-                    f"Plasma object {plasma} passed to animate, but it has no visualize method!"
-                )
-        fig.show(auto_close=False)
+        for renderer in fig.renderers:
+            if not renderer.camera_set:
+                renderer.camera_position = renderer.get_default_cam_pos()
+                renderer.ResetCamera()
         fig.write_frame()
+        abs_vel = self.vector_norm("velocity")
+        self._obj["|v|"] = (("time", "particle"), abs_vel)
+        if plot_arrows:
+            vectors = self._obj["velocity"] / (10 * self._obj["|v|"])
+
         for i in tqdm.auto.trange(1, nframes):
             fig.clear()
             if plasma is not None:
@@ -166,33 +215,41 @@ class ParticleTrackerAccessor:
                     warnings.warn(
                         f"Plasma object {plasma} passed to animate, but it has no visualize method!"
                     )
-                    raise ValueError(
-                        f"Plasma object {plasma} passed to animate, but it has no visualize method!"
-                    )
             frame_max = self._obj.sizes["time"] // nframes * i
-            for particle in particles:
-                trajectories = (
-                    self._obj.position.sel(particle=particle)
-                    .isel(time=range(0, frame_max + 1))
-                    .values
-                )
-                trajectory = pv.Spline(trajectories)
-                fig.add_mesh(trajectory)
+            if plot_trajectories:
+                for particle in particles:
+                    trajectories = (
+                        self._obj.position.sel(particle=particle)
+                        .isel(time=range(0, frame_max + 1))
+                        .values
+                    )
+                    trajectory = pv.Spline(trajectories)
+                    fig.add_mesh(trajectory)
 
             points = (
                 self._obj.position.sel(particle=list(particles))
                 .isel(time=frame_max)
                 .values
             )
-            velocities = (
-                self._obj.velocity.sel(particle=list(particles))
-                .isel(time=frame_max)
-                .values
-            )
+
             point_cloud = pv.PolyData(points)
-            point_cloud.abs_vel = np.linalg.norm(velocities, axis=1, keepdims=True)
-            point_cloud.vectors = velocities / (10 * point_cloud.abs_vel)
-            fig.add_mesh(point_cloud.arrows, show_scalar_bar=False)
+            point_cloud["velocity"] = self._obj["|v|"].isel(time=frame_max)
+            velocity_range = [
+                self._obj["|v|"].min().item(),
+                self._obj["|v|"].max().item(),
+            ]
+            if plot_arrows:
+                point_cloud["vectors"] = vectors.isel(time=frame_max)
+                point_vectors = point_cloud.glyph(
+                    orient="vectors", scale=False, factor=0.15
+                )
+                fig.add_mesh(point_vectors)
+            fig.add_mesh(
+                point_cloud,
+                scalars="velocity",
+                clim=velocity_range,
+                render_points_as_spheres=True,
+            )
             fig.write_frame()
         fig.close()
         if notebook_display:
@@ -210,7 +267,7 @@ class ParticleTracker:
     plasma : `Plasma`
         plasma from which fields can be pulled
     type : str
-        particle type. See `plasmapy.atomic.atomic` for suitable arguments.
+        particle type. See `plasmapy.particles.atomic` for suitable arguments.
         The default is a proton.
     x: `astropy.units.Quantity`
     v: `astropy.units.Quantity`
@@ -232,21 +289,20 @@ class ParticleTracker:
 
     """
 
-    integrators = {
-        "explicit_boris": particle_integrators._boris_push,
-        "implicit_boris": particle_integrators._boris_push_implicit,
-        "implicit_boris2": particle_integrators._boris_push_implicit2,
-        "zenitani": particle_integrators._zenitani,
-    }
+    integrators = {"explicit_boris": particle_integrators.boris_push}
 
-    # @atomic.particle_input
+    _wip_integrators = {"zenitani": particle_integrators._zenitani}
+
+    _all_integrators = dict(**integrators, **_wip_integrators)
+
+    @particle_input
     @check_units()
     def __init__(
         self,
         plasma,
         x: u.m = None,
         v: u.m / u.s = None,
-        particle_type: atomic.Particle = "p",
+        particle_type: particles.Particle = "p",
     ):
 
         if x is not None and v is not None:
@@ -299,15 +355,15 @@ class ParticleTracker:
         dt: u.s = np.inf * u.s,
         nt: int = np.inf,
         """
-        integrator = self.integrators[pusher]
+        integrator = self._all_integrators[pusher]
         if dt is None:
             b = np.linalg.norm(self.plasma.interpolate_B(self.x), axis=-1)
             gyroperiod = (1 / formulary.gyrofrequency(b, self.particle, to_hz=True)).to(
                 u.s
             )
-            dt = gyroperiod.min() / 20
+            dt = gyroperiod.min() / 10
             warnings.warn(
-                f"Set timestep to {dt:.3e}, 1/20 of smallest gyroperiod", UserWarning
+                f"Set timestep to {dt:.3e}, 1/10 of smallest gyroperiod", UserWarning
             )
 
         _dt = dt.si.value
@@ -325,13 +381,10 @@ class ParticleTracker:
         i = 0
 
         init_kinetic = self.kinetic_energy(_v, _m)
-        timestep_info = dict(i=i, dt=_dt)
         if init_kinetic:
             reldelta = self.kinetic_energy(_v, _m) / init_kinetic - 1
-            kinetic_info = {"Relative kinetic energy change": reldelta}
         else:
             delta = self.kinetic_energy(_v, _m)
-            kinetic_info = {"Kinetic energy change": delta}
 
         with np.errstate(all="raise"):
             b = self.plasma._interpolate_B(_x)
@@ -368,7 +421,7 @@ class ParticleTracker:
                     self.plasma._drag(_x, _v)
                 integrator(_x, _v, b, e, _q, _m, _dt)
 
-                # todo should be a list of dicts, probably)
+                # TODO should be a list of dicts, probably)
                 if _time > next_snapshot_update_time:
                     next_snapshot_update_time += _snapshot_timestep
                     _position_history.append(_x.copy())
@@ -416,11 +469,8 @@ class ParticleTracker:
     def __repr__(self, *args, **kwargs):
         return (
             f"ParticleTracker(plasma={self.plasma}, particle_type={self.particle},"
-            f"N = {self.x.shape[0]})"
+            f" N = {self.x.shape[0]})"
         )
-
-    def __str__(self):  # coverage: ignore
-        return f"{self.N} {self.name} with " f"q = {self.q:.2e}, m = {self.m:.2e}"
 
     @check_units
     def _create_xarray(
@@ -435,9 +485,9 @@ class ParticleTracker:
         dimensions="xyz",
         potentials=None,
     ):
+        # TODO replace scheme with OpenPMD! I can't believe I forgot about it!
         data_vars = {}
         assert position_history.shape == velocity_history.shape
-        particles = range(position_history.shape[1])
         data_vars["position"] = (("time", "particle", "dimension"), position_history)
         data_vars["velocity"] = (("time", "particle", "dimension"), velocity_history)
         data_vars["B"] = (("time", "particle", "dimension"), b_history)
@@ -452,7 +502,7 @@ class ParticleTracker:
             data_vars=data_vars,
             coords={
                 "time": times,
-                "particle": particles,
+                "particle": range(position_history.shape[1]),
                 "dimension": list(dimensions),
             },
         )

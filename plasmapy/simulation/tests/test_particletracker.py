@@ -26,7 +26,7 @@ def fit_sine_curve(position, t, expected_gyrofrequency, phase=0):
 
 
 # precalculating unit for efficiency
-E_unit = u.V / u.m
+_volt_over_meter = u.V / u.m
 
 
 def test_run_no_fields(integrator_name):
@@ -34,7 +34,7 @@ def test_run_no_fields(integrator_name):
         return u.Quantity(np.zeros(3), u.T)
 
     def electric_field(r):
-        return u.Quantity(np.zeros(3), E_unit)
+        return u.Quantity(np.zeros(3), _volt_over_meter)
 
     test_plasma = AnalyticalFields(magnetic_field, electric_field)
 
@@ -49,7 +49,7 @@ def test_adjust_position_velocity():
         return u.Quantity(np.zeros(3), u.T)
 
     def electric_field(r):
-        return u.Quantity(np.zeros(3), E_unit)
+        return u.Quantity(np.zeros(3), _volt_over_meter)
 
     test_plasma = AnalyticalFields(magnetic_field, electric_field)
 
@@ -116,7 +116,7 @@ def test_boris_push_electric_field(integrator):
     integrator(x, v, b, e, q, m, dt)
     assert np.isfinite(x).all()
     assert np.isfinite(v).all()
-    assert ((x - e * dt ** 2 / 2 - v * dt / 2) == x_copy).all()
+    np.testing.assert_allclose(x_copy, x - e * dt ** 2 / 2 - v * dt / 2)
 
 
 def test_particle_uniform_magnetic(integrator_name):
@@ -129,7 +129,7 @@ def test_particle_uniform_magnetic(integrator_name):
         return u.Quantity([0, 0, 1], u.T)
 
     def electric_field(r):
-        return u.Quantity(np.zeros(3), E_unit)
+        return u.Quantity(np.zeros(3), _volt_over_meter)
 
     test_plasma = AnalyticalFields(magnetic_field, electric_field)
 
@@ -141,10 +141,10 @@ def test_particle_uniform_magnetic(integrator_name):
     expected_gyroradius = formulary.gyroradius(mean_B, particle_type, Vperp=perp_speed)
     expected_gyroperiod = 1 / expected_gyrofrequency
 
-    dt = expected_gyroperiod / 100
+    dt = expected_gyroperiod / 1e2
     v = u.Quantity([0 * u.m / u.s, perp_speed, parallel_speed]).reshape((1, 3))
     s = ParticleTracker(test_plasma, particle_type=particle_type, v=v)
-    sol = s.run(1e4 * dt, dt, pusher=integrator_name)
+    sol = s.run(1e3 * dt, dt, pusher=integrator_name)
 
     x = sol.position.sel(particle=0, dimension="x")
     z = sol.position.sel(particle=0, dimension="z")
@@ -175,7 +175,7 @@ def test_particle_uniform_magnetic(integrator_name):
         z, p(sol.time), atol=1e-4
     )  # does z-velocity stay constant?
 
-    sol.particletracker.test_kinetic_energy(3)  # is energy conserved?
+    sol.particletracker.test_kinetic_energy()  # is energy conserved?
 
 
 @pytest.mark.xfail(
@@ -196,7 +196,7 @@ def test_particle_exb_drift(integrator_name):
         return u.Quantity([0, 0, 1], u.T)
 
     def electric_field(r):
-        return u.Quantity([0, 1, 0], E_unit)
+        return u.Quantity([0, 1, 0], _volt_over_meter)
 
     test_plasma = AnalyticalFields(magnetic_field, electric_field)
 
