@@ -1,5 +1,4 @@
 import pytest
-
 from plasmapy.utils.datatype_factory_base import (
     BasicRegistrationFactory,
     MultipleMatchError,

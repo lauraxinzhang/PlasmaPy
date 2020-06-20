@@ -1,12 +1,10 @@
 """Functions that retrieve or are related to elemental or isotopic data."""
-
 from numbers import Integral, Real
 from typing import Any, List, Optional, Union
 
-import astropy.constants as const
-import astropy.units as u
 import numpy as np
-
+from astropy import constants as const
+from astropy import units as u
 from plasmapy.particles.elements import _Elements
 from plasmapy.particles.exceptions import (
     InvalidElementError,

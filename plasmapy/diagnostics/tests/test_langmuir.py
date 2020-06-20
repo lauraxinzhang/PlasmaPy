@@ -1,11 +1,9 @@
 # coding=utf-8
 """Tests for Langmuir probe analysis functions."""
-
-import astropy.constants.si as const
 import numpy as np
 import pytest
 from astropy import units as u
-
+from astropy.constants import si as const
 from plasmapy.diagnostics import langmuir
 
 np.random.seed(42)

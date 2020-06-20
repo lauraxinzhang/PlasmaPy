@@ -130,13 +130,11 @@ __all__ = [
     "ion_viscosity",
     "electron_viscosity",
 ]
-
 import warnings
 
 import numpy as np
 from astropy import units as u
 from astropy.constants.si import e, k_B, m_e
-
 from plasmapy import particles, utils
 from plasmapy.formulary.collisions import (
     Coulomb_logarithm,

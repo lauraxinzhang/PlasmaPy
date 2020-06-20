@@ -3,12 +3,11 @@ Dictionaries containing basic atomic data.
 
 The periodic tabla data is from: http://periodic.lanl.gov/index.shtml
 """
-
 import collections
 import json
 import pkgutil
 
-import astropy.units as u
+from astropy import units as u
 
 _PeriodicTable = collections.namedtuple(
     "periodic_table", ["group", "category", "block", "period"]

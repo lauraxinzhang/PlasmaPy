@@ -11,11 +11,9 @@ __all__ = [
     "Wigner_Seitz_radius",
     "chemical_potential",
 ]
-
 import numpy as np
 from astropy import units as u
 from astropy.constants.si import c, e, eps0, h, hbar, k_B, m_e
-
 from plasmapy import particles
 from plasmapy.formulary import mathematics
 from plasmapy.formulary.relativity import Lorentz_factor
@@ -479,7 +477,7 @@ def chemical_potential(n_e: u.m ** -3, T: u.K) -> u.dimensionless_unscaled:
     # setting parameters for fitting along with bounds
     alphaGuess = 1 * u.dimensionless_unscaled
     try:
-        from lmfit import minimize, Parameters
+        from lmfit import Parameters, minimize
     except (ImportError, ModuleNotFoundError) as e:
         from plasmapy.optional_deps import lmfit_import_error
 

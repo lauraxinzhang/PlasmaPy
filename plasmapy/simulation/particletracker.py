@@ -1,13 +1,11 @@
 """
 Class representing a group of particles.
 """
-
 import numpy as np
-import scipy.interpolate as interp
 from astropy import constants
 from astropy import units as u
-
 from plasmapy.particles import atomic
+from scipy import interpolate as interp
 
 __all__ = ["ParticleTracker"]
 
@@ -207,7 +205,7 @@ class ParticleTracker:
     def plot_trajectories(self):  # coverage: ignore
         r"""Draws trajectory history."""
         from astropy.visualization import quantity_support
-        import matplotlib.pyplot as plt
+        from matplotlib import pyplot as plt
         from mpl_toolkits.mplot3d import Axes3D
 
         quantity_support()
@@ -234,7 +232,7 @@ class ParticleTracker:
             letters included in `plot`.
         """
         from astropy.visualization import quantity_support
-        import matplotlib.pyplot as plt
+        from matplotlib import pyplot as plt
         from mpl_toolkits.mplot3d import Axes3D
 
         quantity_support()

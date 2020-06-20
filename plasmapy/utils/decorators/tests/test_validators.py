@@ -9,7 +9,6 @@ from unittest import mock
 
 import pytest
 from astropy import units as u
-
 from plasmapy.utils.decorators.checks import CheckUnits, CheckValues
 from plasmapy.utils.decorators.validators import ValidateQuantities, validate_quantities
 from plasmapy.utils.exceptions import ImplicitUnitConversionWarning

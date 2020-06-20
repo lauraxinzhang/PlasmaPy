@@ -1,10 +1,8 @@
 """Tests the Fermi_integral function in the mathematics module."""
 
 # This file contains experimental usage of unicode characters.
-
 import numpy as np
 import pytest
-
 from plasmapy.formulary.mathematics import Fermi_integral
 
 

@@ -1,10 +1,9 @@
 """Tests for functions that uses Distribution functions."""
-
 import numpy as np
 import pytest
-import scipy.integrate as spint
 from astropy import units as u
 from astropy.constants import c, e, eps0, k_B, m_e, m_p, mu0
+from scipy import integrate as spint
 
 from ..distribution import (
     Maxwellian_1D,

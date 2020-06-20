@@ -3,10 +3,9 @@ import itertools
 from numbers import Real
 from typing import Dict
 
-import astropy.units as u
 import numpy as np
 import pytest
-
+from astropy import units as u
 from plasmapy.particles import (
     IonizationState,
     IonizationStates,

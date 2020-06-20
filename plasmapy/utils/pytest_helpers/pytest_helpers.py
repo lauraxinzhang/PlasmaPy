@@ -5,13 +5,12 @@ import inspect
 import warnings
 from typing import Any, Callable, Dict
 
-import astropy.constants as const
-import astropy.tests.helper as astrohelper
-import astropy.units as u
 import colorama
 import numpy as np
 import pytest
-
+from astropy import constants as const
+from astropy import units as u
+from astropy.tests import helper as astrohelper
 from plasmapy.utils.error_messages import _exc_str, _represent_result, call_string
 from plasmapy.utils.exceptions import PlasmaPyWarning
 from plasmapy.utils.pytest_helpers.exceptions import (

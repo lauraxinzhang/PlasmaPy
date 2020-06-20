@@ -1,17 +1,15 @@
 """Tests for the plasma dispersion function and its derivative"""
 
 # This file contains experimental usage of unicode characters.
-
 import numpy as np
 import pytest
 from astropy import units as u
 from numpy import pi as π
-from scipy.special import gamma as Γ
-
 from plasmapy.formulary.dispersionfunction import (
     plasma_dispersion_func,
     plasma_dispersion_func_deriv,
 )
+from scipy.special import gamma as Γ
 
 # (w, expected)
 plasma_dispersion_func_table = [

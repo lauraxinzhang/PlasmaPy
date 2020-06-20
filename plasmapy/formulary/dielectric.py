@@ -4,13 +4,11 @@ __all__ = [
     "cold_plasma_permittivity_LRP",
     "permittivity_1D_Maxwellian",
 ]
-
 from collections import namedtuple
 
 import numpy as np
 from astropy import units as u
 from numpy import pi
-
 from plasmapy.formulary import parameters
 from plasmapy.formulary.dispersionfunction import plasma_dispersion_func_deriv
 from plasmapy.utils.decorators import validate_quantities

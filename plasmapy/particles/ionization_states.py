@@ -3,14 +3,12 @@ A class for storing ionization state data for multiple elements or
 isotopes.
 """
 __all__ = ["IonizationStates"]
-
 import collections
 from numbers import Integral, Real
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from astropy import units as u
-
 from plasmapy.particles.atomic import atomic_number
 from plasmapy.particles.exceptions import AtomicError, ChargeError, InvalidParticleError
 from plasmapy.particles.ionization_state import IonizationState, State

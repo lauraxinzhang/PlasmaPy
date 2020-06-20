@@ -1,9 +1,8 @@
 import os
 from distutils.version import StrictVersion
 
-import astropy.units as u
 import numpy as np
-
+from astropy import units as u
 from plasmapy.plasma.exceptions import DataStandardError
 from plasmapy.plasma.plasma_base import GenericPlasma
 

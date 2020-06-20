@@ -9,12 +9,10 @@ highly turbulent, while turbulence is negligible at low Reynolds
 numbers.
 """
 __all__ = ["beta", "quantum_theta", "Reynolds_number", "Mag_Reynolds"]
-
 from astropy import constants
 from astropy import units as u
 from astropy.constants import c
 from astropy.constants.codata2010 import mu0
-
 from plasmapy.formulary import electron_viscosity, parameters, quantum
 from plasmapy.utils.decorators import validate_quantities
 

@@ -2,10 +2,8 @@
 Formulas for calculating particle drifts.
 """
 __all__ = ["ExB_drift", "force_drift"]
-
-import astropy.units as u
 import numpy as np
-
+from astropy import units as u
 from plasmapy.utils.decorators import validate_quantities
 
 

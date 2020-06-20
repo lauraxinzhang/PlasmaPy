@@ -1,10 +1,8 @@
 r"""Functionality for calculating relativistic quantities (:math:`v \to c`)."""
 __all__ = ["Lorentz_factor", "relativistic_energy"]
-
 import numpy as np
 from astropy import units as u
 from astropy.constants import c
-
 from plasmapy import utils
 from plasmapy.utils.decorators import validate_quantities
 

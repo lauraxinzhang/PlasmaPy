@@ -1,9 +1,8 @@
 import warnings
 from typing import Any
 
-import astropy.units as u
 import pytest
-
+from astropy import units as u
 from plasmapy.particles import Particle
 from plasmapy.utils import call_string
 from plasmapy.utils.exceptions import PlasmaPyError, PlasmaPyWarning

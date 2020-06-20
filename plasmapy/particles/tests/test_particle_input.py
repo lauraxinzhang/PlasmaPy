@@ -1,7 +1,6 @@
 from typing import List, Optional, Tuple, Union
 
 import pytest
-
 from plasmapy.particles.exceptions import (
     AtomicError,
     ChargeError,

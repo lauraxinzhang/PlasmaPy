@@ -111,8 +111,8 @@ def online_help(query):
     query : str
         The search query.
     """
-    from urllib.parse import urlencode
     import webbrowser
+    from urllib.parse import urlencode
 
     url = (
         "http://docs.plasmapy.org/en/stable/search.html?"

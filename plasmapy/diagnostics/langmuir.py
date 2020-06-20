@@ -17,17 +17,15 @@ __all__ = [
     "extrapolate_ion_current_OML",
     "get_EEDF",
 ]
-
 import copy
 
-import astropy.constants.si as const
 import numpy as np
 from astropy import units as u
+from astropy.constants import si as const
 from astropy.visualization import quantity_support
-from scipy.optimize import curve_fit
-
 from plasmapy.particles import Particle
 from plasmapy.utils.decorators import validate_quantities
+from scipy.optimize import curve_fit
 
 
 def _fit_func_lin(x, x0, y0, c0):
@@ -183,7 +181,7 @@ class Characteristic:
     def plot(self):  # coverage: ignore
         r"""Plot the characteristic in matplotlib."""
         try:
-            import matplotlib.pyplot as plt
+            from matplotlib import pyplot as plt
         except (ImportError, ModuleNotFoundError) as e:
             from plasmapy.optional_deps import mpl_import_error
 
@@ -350,7 +348,7 @@ def swept_probe_analysis(
 
     if visualize:  # coverage: ignore
         try:
-            import matplotlib.pyplot as plt
+            from matplotlib import pyplot as plt
         except (ImportError, ModuleNotFoundError) as e:
             from plasmapy.optional_deps import mpl_import_error
 
@@ -948,7 +946,7 @@ def get_electron_temperature(
 
     if visualize:  # coverage: ignore
         try:
-            import matplotlib.pyplot as plt
+            from matplotlib import pyplot as plt
         except (ImportError, ModuleNotFoundError) as e:
             from plasmapy.optional_deps import mpl_import_error
 
@@ -1062,7 +1060,7 @@ def extrapolate_electron_current(
 
     if visualize:  # coverage: ignore
         try:
-            import matplotlib.pyplot as plt
+            from matplotlib import pyplot as plt
         except (ImportError, ModuleNotFoundError) as e:
             from plasmapy.optional_deps import mpl_import_error
 
@@ -1218,7 +1216,7 @@ def get_ion_density_OML(
 
     if visualize:  # coverage: ignore
         try:
-            import matplotlib.pyplot as plt
+            from matplotlib import pyplot as plt
         except (ImportError, ModuleNotFoundError) as e:
             from plasmapy.optional_deps import mpl_import_error
 
@@ -1291,7 +1289,7 @@ def extrapolate_ion_current_OML(probe_characteristic, fit, visualize=False):
 
     if visualize:  # coverage: ignore
         try:
-            import matplotlib.pyplot as plt
+            from matplotlib import pyplot as plt
         except (ImportError, ModuleNotFoundError) as e:
             from plasmapy.optional_deps import mpl_import_error
 
@@ -1390,7 +1388,7 @@ def get_EEDF(probe_characteristic, visualize=False):
 
     if visualize:  # coverage: ignore
         try:
-            import matplotlib.pyplot as plt
+            from matplotlib import pyplot as plt
         except (ImportError, ModuleNotFoundError) as e:
             from plasmapy.optional_deps import mpl_import_error
 

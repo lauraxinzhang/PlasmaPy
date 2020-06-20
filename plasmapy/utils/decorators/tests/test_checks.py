@@ -11,7 +11,6 @@ import numpy as np
 import pytest
 from astropy import units as u
 from astropy.constants import c
-
 from plasmapy.utils.decorators.checks import (
     CheckBase,
     CheckUnits,

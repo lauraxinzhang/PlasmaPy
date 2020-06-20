@@ -1,18 +1,15 @@
 """The Particle class."""
 
 __all__ = ["AbstractParticle", "Particle", "DimensionlessParticle", "CustomParticle"]
-
 import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict, namedtuple
 from numbers import Complex, Integral, Real
 from typing import List, Optional, Set, Tuple, Union
 
-import astropy.constants as const
-import astropy.units as u
 import numpy as np
-
-import plasmapy.utils.roman as roman
+from astropy import constants as const
+from astropy import units as u
 from plasmapy.particles.elements import _Elements, _PeriodicTable
 from plasmapy.particles.exceptions import (
     AtomicError,
@@ -37,6 +34,7 @@ from plasmapy.particles.special_particles import (
     _Particles,
     _special_ion_masses,
 )
+from plasmapy.utils import roman as roman
 
 _classification_categories = {
     "lepton",

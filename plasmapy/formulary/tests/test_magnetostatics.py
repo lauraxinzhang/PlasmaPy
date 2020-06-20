@@ -2,7 +2,6 @@ import numpy as np
 import pytest
 from astropy import constants
 from astropy import units as u
-
 from plasmapy.formulary.magnetostatics import (
     CircularWire,
     FiniteStraightWire,

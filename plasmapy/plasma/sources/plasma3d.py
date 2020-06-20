@@ -1,11 +1,10 @@
 """
 Defines the core Plasma class used by PlasmaPy to represent plasma properties.
 """
-
 import itertools
 
-import astropy.units as u
 import numpy as np
+from astropy import units as u
 from astropy.constants import mu0
 from plasmapy.formulary.magnetostatics import MagnetoStatics
 from plasmapy.plasma.plasma_base import GenericPlasma

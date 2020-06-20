@@ -1,9 +1,8 @@
 import collections
 
-import astropy.units as u
 import numpy as np
 import pytest
-
+from astropy import units as u
 from plasmapy.particles import (
     Particle,
     atomic_number,
