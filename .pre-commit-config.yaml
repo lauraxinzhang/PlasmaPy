@@ -10,7 +10,7 @@ repos:
     -   id: check-ast
     -   id: requirements-txt-fixer
 -   repo: https://github.com/timothycrosley/isort
-    rev: 4.3.21-2
+    rev: 5a9624dd8105bb60322a095efb1a5df18322fe39
     hooks:
     -   id: isort
         name: isort
